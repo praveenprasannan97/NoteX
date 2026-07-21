@@ -1,0 +1,360 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}NoteX{% endblock %}</title>
+<script>
+  /* Apply saved theme before paint to avoid flash-of-wrong-theme */
+  (function () {
+    var theme = localStorage.getItem('notex_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<style>
+  /* Drop Inter-Regular.woff2 / Inter-Medium.woff2 / Inter-SemiBold.woff2 / Inter-Bold.woff2
+     (from Google Fonts) into notes/static/fonts/ to self-host. Until then this
+     silently falls back to the system font stack below - no network request is made. */
+  @font-face {
+    font-family: 'Inter';
+    src: url('{% static "fonts/Inter-Regular.woff2" %}') format('woff2');
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Inter';
+    src: url('{% static "fonts/Inter-Medium.woff2" %}') format('woff2');
+    font-weight: 500; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Inter';
+    src: url('{% static "fonts/Inter-SemiBold.woff2" %}') format('woff2');
+    font-weight: 600; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Inter';
+    src: url('{% static "fonts/Inter-Bold.woff2" %}') format('woff2');
+    font-weight: 700; font-style: normal; font-display: swap;
+  }
+  :root {
+    --bg: #f6f4fc;
+    --bg-elevated: #ffffff;
+    --bg-hover: #eeebf9;
+    --border: #ddd7f1;
+    --text: #1b1a24;
+    --text-muted: #6b6779;
+    --accent: #7F77DD;
+    --accent-hover: #6b62c9;
+    --danger: #e0503c;
+    --danger-hover: #c8452f;
+    --shadow: 0 4px 16px rgba(70, 60, 120, 0.10);
+    --radius: 10px;
+    --heading-tint: #4a3f8f;
+    --content-tint: #6f64ad;
+  }
+  html[data-theme="dark"] {
+    --bg: #08080c;
+    --bg-elevated: #0f0f16;
+    --bg-hover: #1a1a24;
+    --border: #232430;
+    --text: #e8e7f0;
+    --text-muted: #8b889a;
+    --accent: #8f87e8;
+    --accent-hover: #a49dee;
+    --danger: #ef6252;
+    --danger-hover: #f37a6c;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    --heading-tint: #d3cdf7;
+    --content-tint: #a89ee0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  button { font-family: inherit; }
+  .icon { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .icon-fill { fill: currentColor; stroke: none; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text); cursor: pointer;
+    font-size: 14px; font-weight: 500; transition: background .15s, border-color .15s, transform .1s;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .btn-danger:hover { background: var(--danger-hover); border-color: var(--danger-hover); }
+  .btn-icon { padding: 8px; }
+  .btn-ghost { background: transparent; border-color: transparent; }
+  .btn-ghost:hover { background: var(--bg-hover); }
+
+  input[type="text"], input[type="password"], input[type="email"], select, textarea {
+    background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+
+  /* ---------- top nav ---------- */
+  .topnav {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px 20px; background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-left { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .nav-toggle-btn {
+    display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+    border-radius: 8px; border: none; background: none; color: var(--text); cursor: pointer; flex-shrink: 0;
+  }
+  .nav-toggle-btn:hover { background: var(--bg-hover); }
+  .brand { display: flex; align-items: center; font-weight: 700; font-size: 18px; text-decoration: none; white-space: nowrap; }
+  .nav-center { flex: 1; display: flex; justify-content: center; min-width: 0; }
+  .search-wrap { position: relative; width: 100%; max-width: 480px; }
+  .search-wrap input { width: 100%; padding-left: 36px; padding-right: 34px; }
+  .search-wrap > svg.icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+  .search-clear {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; border-radius: 6px;
+    background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0;
+    display: none; align-items: center; justify-content: center;
+  }
+  .search-clear:hover { background: var(--bg-hover); color: var(--text); }
+  .search-clear.show { display: flex; }
+
+  .nav-right { display: flex; align-items: center; gap: 10px; position: relative; flex-shrink: 0; }
+  .avatar-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--accent); color: #fff; font-weight: 600; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .dropdown {
+    position: absolute; top: 46px; right: 0; width: 240px; max-width: calc(100vw - 24px);
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 8px; display: none; flex-direction: column; gap: 2px;
+    z-index: 50;
+  }
+  .dropdown.open { display: flex; }
+  .dropdown-header { padding: 8px 10px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .dropdown-header .name { font-weight: 600; font-size: 14px; }
+  .dropdown-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 9px 10px; border-radius: 6px; cursor: pointer; background: none; border: none;
+    color: var(--text); font-size: 14px; text-align: left; width: 100%; text-decoration: none;
+  }
+  .dropdown-row:hover { background: var(--bg-hover); }
+  .dropdown-row .left { display: flex; align-items: center; gap: 10px; }
+
+  .switch { position: relative; width: 38px; height: 22px; border-radius: 999px; background: var(--border); cursor: pointer; border: none; flex-shrink: 0; }
+  .switch::after { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: transform .15s; }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { transform: translateX(16px); }
+
+  /* ---------- layout ---------- */
+  .app-shell { display: flex; min-height: calc(100vh - var(--nav-h, 57px)); }
+
+  /* ---------- modal ---------- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(10, 11, 15, 0.5);
+    display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); width: 100%; max-width: 420px; padding: 20px;
+  }
+  .modal h3 { margin: 0 0 4px; font-size: 17px; }
+  .modal p { color: var(--text-muted); font-size: 14px; margin: 8px 0 18px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+  .toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 16px; border-radius: 8px; box-shadow: var(--shadow); font-size: 14px;
+    animation: toast-in .15s ease-out;
+  }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+
+  @media (max-width: 720px) {
+    .topnav { padding: 10px 12px; gap: 8px; }
+    .brand { font-size: 16px; }
+    .search-wrap { max-width: 40vw; }
+    .search-wrap input { padding-left: 30px; padding-right: 28px; font-size: 13px; }
+    .search-wrap > svg.icon { left: 8px; width: 15px; height: 15px; }
+    .search-clear { width: 24px; height: 24px; right: 2px; }
+  }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="nav-left">
+    {% block navleft_extra %}{% endblock %}
+    <a href="{% url 'notes_list' %}" class="brand">NoteX</a>
+  </div>
+  <div class="nav-center">{% block navcenter %}{% endblock %}</div>
+  <div class="nav-right">
+    {% block navright_extra %}{% endblock %}
+    <button class="avatar-btn" id="avatarBtn" title="Account">{{ request.user.username|slice:":1"|upper }}</button>
+    <div class="dropdown" id="profileDropdown">
+      <div class="dropdown-header">
+        <div class="name">{{ request.user.username }}</div>
+      </div>
+      <div class="dropdown-row">
+        <div class="left">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v1M12 20v1M4.2 4.2l.7.7M19.1 19.1l.7.7M3 12h1M20 12h1M4.2 19.8l.7-.7M19.1 4.9l.7-.7"/><circle cx="12" cy="12" r="4"/></svg>
+          <span>Dark mode</span>
+        </div>
+        <button class="switch" id="themeSwitch" type="button" aria-label="Toggle dark mode"></button>
+      </div>
+      <a href="{% url 'settings' %}" class="dropdown-row">
+        <div class="left">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9c.2.6.7 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          <span>Settings</span>
+        </div>
+      </a>
+      <button class="dropdown-row" id="logoutBtn" type="button">
+        <div class="left">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          <span>Logout</span>
+        </div>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="app-shell">
+{% block body %}{% endblock %}
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<form id="logoutForm" action="{% url 'logout' %}" method="post" style="display:none">
+  {% csrf_token %}
+</form>
+
+<script>
+/* ---- shared helpers ---- */
+function getCookie(name) {
+  const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+const CSRF_TOKEN = getCookie('csrftoken');
+
+/* ---- keep --nav-h in sync with the actual (possibly wrapped) nav height ---- */
+function updateNavHeightVar() {
+  const nav = document.querySelector('.topnav');
+  if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+}
+window.addEventListener('DOMContentLoaded', updateNavHeightVar);
+window.addEventListener('load', updateNavHeightVar);
+window.addEventListener('resize', updateNavHeightVar);
+
+async function apiFetch(url, options = {}) {
+  options.headers = Object.assign({
+    'X-CSRFToken': CSRF_TOKEN,
+    'Content-Type': 'application/json',
+  }, options.headers || {});
+  const res = await fetch(url, options);
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* ignore */ }
+  if (!res.ok && !data.error) data.error = 'Something went wrong. Please try again.';
+  return data;
+}
+
+function showToast(message, isError) {
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = message;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+/* ---- theme ---- */
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('notex_theme', theme);
+  const sw = document.getElementById('themeSwitch');
+  if (sw) sw.classList.toggle('on', theme === 'dark');
+}
+(function initTheme() {
+  const theme = localStorage.getItem('notex_theme') || 'dark';
+  document.addEventListener('DOMContentLoaded', () => applyTheme(theme));
+})();
+document.addEventListener('DOMContentLoaded', () => {
+  const sw = document.getElementById('themeSwitch');
+  if (sw) {
+    sw.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+      if (window.__notexReloadOnTheme) window.location.reload();
+    });
+  }
+
+  /* ---- profile dropdown ---- */
+  const avatarBtn = document.getElementById('avatarBtn');
+  const dropdown = document.getElementById('profileDropdown');
+  if (avatarBtn) {
+    avatarBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target) && e.target !== avatarBtn) dropdown.classList.remove('open');
+    });
+  }
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem('notex_token');
+      document.getElementById('logoutForm').submit();
+    });
+  }
+});
+
+/* ---- generic confirm modal ---- */
+function confirmAction({ title, message, confirmLabel, onConfirm, onCancel }) {
+  const overlay = document.getElementById('confirmOverlay');
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMessage').textContent = message;
+  const okBtn = document.getElementById('confirmOkBtn');
+  const cancelBtn = document.getElementById('confirmCancelBtn');
+  okBtn.textContent = confirmLabel || 'Confirm';
+  overlay.classList.add('open');
+
+  const cleanup = () => {
+    overlay.classList.remove('open');
+    okBtn.removeEventListener('click', onOk);
+    cancelBtn.removeEventListener('click', onCancelClick);
+  };
+  const onOk = () => { cleanup(); if (onConfirm) onConfirm(); };
+  const onCancelClick = () => { cleanup(); if (onCancel) onCancel(); };
+  okBtn.addEventListener('click', onOk, { once: true });
+  cancelBtn.addEventListener('click', onCancelClick, { once: true });
+}
+</script>
+
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmMessage"></p>
+    <div class="modal-actions">
+      <button class="btn" id="confirmCancelBtn">Cancel</button>
+      <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+{% block extra_body %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,370 @@
+{% extends "notes/base.html" %}
+{% load static %}
+{% block title %}{{ note.title }} &middot; NoteX{% endblock %}
+
+{% block extra_head %}
+<style>
+  .editor-shell { flex: 1; padding: 24px; max-width: 960px; margin: 0 auto; width: 100%; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-size: 14px; margin-bottom: 14px; }
+  .back-link:hover { color: var(--text); }
+
+  .note-header { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .title-block { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #titleDisplay { font-size: 24px; font-weight: 700; margin: 0; word-break: break-word; color: var(--heading-tint); }
+  .title-input-edit { flex: 1; min-width: 180px; font-size: 22px; font-weight: 700; padding: 8px 10px; }
+  .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .icon-only-btn { padding: 8px; }
+  .cat-select { min-width: 180px; }
+  .note-tag { background: var(--bg-hover); border: 1px solid var(--border); padding: 4px 12px; border-radius: 999px; font-size: 12px; color: var(--text-muted); }
+
+  .meta-row { display: flex; align-items: center; gap: 14px; color: var(--text-muted); font-size: 13px; margin-bottom: 20px; flex-wrap: wrap; }
+
+  /* ---------- tabs, styled like a browser/folder tab strip ---------- */
+  .tabs-bar {
+    display: flex; align-items: flex-end; gap: 4px; background: var(--bg-hover);
+    border: 1px solid var(--border); border-bottom: none;
+    padding: 10px 10px 0; border-radius: 12px 12px 0 0; overflow-x: auto;
+  }
+  .page-tab {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 16px 10px; border-top: 3px solid transparent; border-radius: 8px 8px 0 0;
+    cursor: pointer; background: var(--bg); color: var(--text-muted); font-weight: 600; font-size: 14px;
+    white-space: nowrap; transition: background .15s, color .15s, border-color .15s; user-select: none;
+  }
+  .page-tab:hover:not(.active) { background: var(--bg-elevated); color: var(--text); }
+  .page-tab.active { background: var(--bg-elevated); color: var(--text); border-top-color: var(--accent); }
+  .tab-icon-btn {
+    background: none; border: none; cursor: pointer; color: inherit; opacity: .65;
+    padding: 3px; border-radius: 5px; display: flex; align-items: center;
+  }
+  .tab-icon-btn:hover { opacity: 1; background: var(--bg-hover); }
+  .tab-icon-btn.tab-delete-btn:hover { color: var(--danger); }
+  .tab-icon-btn svg { width: 14px; height: 14px; }
+  .add-tab-btn {
+    display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; margin-bottom: 2px;
+    border-radius: 8px; border: 1px dashed var(--border); background: none; color: var(--text-muted); cursor: pointer; flex-shrink: 0;
+  }
+  .add-tab-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .page-panel {
+    background: var(--bg-elevated); border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius); padding: 20px; min-height: 300px;
+  }
+  .page-toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 14px; }
+  .page-toolbar:empty { display: none; margin: 0; }
+  .page-view-content { font-size: 15px; line-height: 1.7; word-break: break-word; }
+  .page-view-content:empty::before { content: "This page is empty."; color: var(--text-muted); font-style: italic; }
+  .page-view-content img { max-width: 100%; }
+  .page-view-content table { border-collapse: collapse; }
+  .page-view-content table td, .page-view-content table th { border: 1px solid var(--border); padding: 6px 10px; }
+
+  /* TinyMCE can get stuck with stale inline styles from its own async
+     "reveal" step, which collapses the editable area to 0 height.
+     Force the correct flex layout regardless of that internal state. */
+  .tox.tox-tinymce { display: flex !important; flex-direction: column !important; visibility: visible !important; }
+  .tox .tox-editor-container { display: flex !important; flex-direction: column !important; flex: 1 1 auto !important; min-height: 0 !important; }
+  .tox .tox-edit-area { flex: 1 1 auto !important; min-height: 0 !important; height: auto !important; }
+  .tox .tox-edit-area__iframe { height: 100% !important; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="editor-shell">
+  <a href="{% url 'notes_list' %}" class="back-link">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to notes
+  </a>
+
+  <div class="note-header">
+    <div class="title-block" id="titleBlockView">
+      <h1 id="titleDisplay">{{ note.title }}</h1>
+      <span class="note-tag" id="categoryBadge" {% if not note.category %}style="display:none"{% endif %}>{{ note.category }}</span>
+    </div>
+    <div class="title-block" id="titleBlockEdit" style="display:none">
+      <input type="text" id="titleInputEdit" class="title-input-edit" maxlength="255">
+      <select id="categorySelect" class="cat-select">
+        <option value="">No category</option>
+        {% for c in categories %}
+          <option value="{{ c.name }}" {% if c.name == note.category %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="header-actions" id="titleViewActions">
+      <button class="btn btn-icon icon-only-btn" id="editTitleBtn" title="Edit title and category">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+      <button class="btn btn-danger btn-icon" id="deleteNoteBtn" title="Delete note">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6h12z"/></svg>
+      </button>
+    </div>
+    <div class="header-actions" id="titleEditActions" style="display:none">
+      <button class="btn btn-primary btn-icon" id="saveTitleBtn" title="Save">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+      </button>
+      <button class="btn btn-icon" id="cancelTitleBtn" title="Cancel">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="meta-row">
+    <span id="updatedLabel">Updated {{ note.updated_at|date:"M j, Y, g:i A" }} UTC</span>
+  </div>
+
+  <div class="tabs-bar" id="tabsBar"></div>
+  <div class="page-panel">
+    <div class="page-toolbar" id="pageToolbar"></div>
+    <div class="page-view-content" id="pageViewContent"></div>
+    <textarea id="pageEditor" style="display:none"></textarea>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+{{ pages|json_script:"pages-data" }}
+<script src="{% static 'tinyMCE/tinymce.min.js' %}" referrerpolicy="origin"></script>
+<script>
+  window.__notexReloadOnTheme = true;
+  const NOTE_ID = {{ note.id }};
+  const MAX_PAGES = {{ max_pages }};
+  let PAGES = JSON.parse(document.getElementById('pages-data').textContent);
+  let activePage = 1;
+  let editing = false;
+
+  function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
+
+  function renderTabs() {
+    const bar = document.getElementById('tabsBar');
+    bar.innerHTML = '';
+    PAGES.forEach(p => {
+      const tab = document.createElement('div');
+      tab.className = 'page-tab' + (p.number === activePage ? ' active' : '');
+      tab.addEventListener('click', () => {
+        if (editing) return; // avoid switching mid-edit
+        activePage = p.number;
+        renderTabs();
+        renderPage();
+      });
+
+      const label = document.createElement('span');
+      label.textContent = 'Page ' + p.number;
+      tab.appendChild(label);
+
+      if (p.number === activePage && !editing) {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'tab-icon-btn';
+        editBtn.title = 'Edit page';
+        editBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
+        editBtn.addEventListener('click', (e) => { e.stopPropagation(); startEdit(); });
+        tab.appendChild(editBtn);
+
+        if (PAGES.length > 1) {
+          const delBtn = document.createElement('button');
+          delBtn.className = 'tab-icon-btn tab-delete-btn';
+          delBtn.title = 'Delete page';
+          delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6h12z"/></svg>';
+          delBtn.addEventListener('click', (e) => { e.stopPropagation(); confirmDeletePage(p.number); });
+          tab.appendChild(delBtn);
+        }
+      }
+
+      bar.appendChild(tab);
+    });
+    if (PAGES.length < MAX_PAGES && !editing) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-tab-btn';
+      addBtn.title = 'Add page';
+      addBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg>';
+      addBtn.addEventListener('click', addPage);
+      bar.appendChild(addBtn);
+    }
+  }
+
+  function getPage(num) { return PAGES.find(p => p.number === num); }
+
+  function renderPage() {
+    const toolbar = document.getElementById('pageToolbar');
+    const viewEl = document.getElementById('pageViewContent');
+    const editorEl = document.getElementById('pageEditor');
+    const page = getPage(activePage);
+
+    if (!editing) {
+      destroyEditorIfAny();
+      viewEl.style.display = 'block';
+      editorEl.style.display = 'none';
+      viewEl.innerHTML = page.content || '';
+      toolbar.innerHTML = '';
+    } else {
+      viewEl.style.display = 'none';
+      editorEl.style.display = 'block';
+      editorEl.value = page.content || '';
+
+      toolbar.innerHTML = '';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.addEventListener('click', cancelEdit);
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn btn-primary';
+      saveBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Save';
+      saveBtn.addEventListener('click', savePage);
+      toolbar.appendChild(cancelBtn);
+      toolbar.appendChild(saveBtn);
+
+      initEditor();
+    }
+  }
+
+  function initEditor() {
+    destroyEditorIfAny();
+    tinymce.init({
+      selector: '#pageEditor',
+      base_url: '{% static "tinyMCE/" %}',
+      suffix: '.min',
+      license_key: 'gpl',
+      height: 420,
+      menubar: false,
+      skin: currentTheme() === 'dark' ? 'oxide-dark' : 'oxide',
+      content_css: currentTheme() === 'dark' ? 'dark' : 'default',
+      plugins: 'lists link image code fullscreen table searchreplace autolink wordcount charmap advlist preview',
+      toolbar: 'undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | ' +
+               'alignleft aligncenter alignright | bullist numlist outdent indent | ' +
+               'link image table | code fullscreen preview',
+      branding: false,
+      promotion: false,
+      setup: (ed) => {
+        ed.on('init', () => {
+          const container = ed.getContainer();
+          if (container) container.style.visibility = 'visible';
+        });
+      },
+    });
+  }
+  function destroyEditorIfAny() {
+    const inst = tinymce.get('pageEditor');
+    if (inst) inst.remove();
+  }
+
+  function startEdit() { editing = true; renderTabs(); renderPage(); }
+  function cancelEdit() { editing = false; renderTabs(); renderPage(); }
+
+  async function savePage() {
+    const content = tinymce.get('pageEditor').getContent();
+    const res = await apiFetch(`/api/notes/${NOTE_ID}/page/${activePage}/update/`, {
+      method: 'POST', body: JSON.stringify({ content }),
+    });
+    if (res.ok) {
+      getPage(activePage).content = content;
+      document.getElementById('updatedLabel').textContent = 'Updated ' + new Date(res.updated_at).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC';
+      editing = false;
+      renderTabs();
+      renderPage();
+      showToast('Page saved');
+    } else {
+      showToast(res.error || 'Could not save page', true);
+    }
+  }
+
+  async function addPage() {
+    const res = await apiFetch(`/api/notes/${NOTE_ID}/page/add/`, { method: 'POST' });
+    if (res.ok) {
+      PAGES.push({ number: res.page_number, content: '' });
+      activePage = res.page_number;
+      editing = true;
+      renderTabs();
+      renderPage();
+    } else {
+      showToast(res.error || 'Could not add page', true);
+    }
+  }
+
+  function confirmDeletePage(num) {
+    confirmAction({
+      title: 'Delete this page?',
+      message: `Page ${num} and its content will be permanently deleted.`,
+      confirmLabel: 'Delete page',
+      onConfirm: async () => {
+        const res = await apiFetch(`/api/notes/${NOTE_ID}/page/${num}/delete/`, { method: 'POST' });
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          showToast(res.error || 'Could not delete page', true);
+        }
+      }
+    });
+  }
+
+  /* ---------- title + category edit (combined) ---------- */
+  const titleDisplay = document.getElementById('titleDisplay');
+  const titleInputEdit = document.getElementById('titleInputEdit');
+  const categoryBadge = document.getElementById('categoryBadge');
+  const categorySelect = document.getElementById('categorySelect');
+
+  document.getElementById('editTitleBtn').addEventListener('click', () => {
+    titleInputEdit.value = titleDisplay.textContent.trim();
+    categorySelect.value = categoryBadge.textContent.trim();
+    document.getElementById('titleBlockView').style.display = 'none';
+    document.getElementById('titleBlockEdit').style.display = 'flex';
+    document.getElementById('titleViewActions').style.display = 'none';
+    document.getElementById('titleEditActions').style.display = 'flex';
+    titleInputEdit.focus();
+  });
+
+  function closeTitleEdit() {
+    document.getElementById('titleBlockView').style.display = 'flex';
+    document.getElementById('titleBlockEdit').style.display = 'none';
+    document.getElementById('titleViewActions').style.display = 'flex';
+    document.getElementById('titleEditActions').style.display = 'none';
+  }
+  document.getElementById('cancelTitleBtn').addEventListener('click', closeTitleEdit);
+
+  document.getElementById('saveTitleBtn').addEventListener('click', async () => {
+    const title = titleInputEdit.value.trim();
+    if (!title) { showToast('Title cannot be empty', true); return; }
+    const category = categorySelect.value;
+
+    const [titleRes, catRes] = await Promise.all([
+      apiFetch(`/api/notes/${NOTE_ID}/update-title/`, { method: 'POST', body: JSON.stringify({ title }) }),
+      apiFetch(`/api/notes/${NOTE_ID}/update-category/`, { method: 'POST', body: JSON.stringify({ category }) }),
+    ]);
+
+    if (titleRes.ok && catRes.ok) {
+      titleDisplay.textContent = titleRes.title;
+      document.title = titleRes.title + ' \u00b7 NoteX';
+      if (catRes.category) {
+        categoryBadge.textContent = catRes.category;
+        categoryBadge.style.display = 'inline-block';
+      } else {
+        categoryBadge.textContent = '';
+        categoryBadge.style.display = 'none';
+      }
+      closeTitleEdit();
+      showToast('Note updated');
+    } else {
+      showToast((titleRes.error || catRes.error) || 'Could not update note', true);
+    }
+  });
+
+  /* ---------- delete note ---------- */
+  document.getElementById('deleteNoteBtn').addEventListener('click', () => {
+    confirmAction({
+      title: 'Delete this note?',
+      message: 'This will permanently delete the note and all of its pages.',
+      confirmLabel: 'Delete note',
+      onConfirm: async () => {
+        const res = await apiFetch(`/api/notes/${NOTE_ID}/delete/`, { method: 'POST' });
+        if (res.ok) {
+          window.location.href = '{% url "notes_list" %}';
+        } else {
+          showToast(res.error || 'Could not delete note', true);
+        }
+      }
+    });
+  });
+
+  /* ---------- init ---------- */
+  renderTabs();
+  renderPage();
+</script>
+{% endblock %}

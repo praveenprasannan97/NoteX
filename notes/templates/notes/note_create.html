@@ -1,0 +1,109 @@
+{% extends "notes/base.html" %}
+{% load static %}
+{% block title %}NoteX &middot; New note{% endblock %}
+
+{% block extra_head %}
+<style>
+  .editor-shell { flex: 1; padding: 24px; max-width: 960px; margin: 0 auto; width: 100%; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-size: 14px; margin-bottom: 14px; }
+  .back-link:hover { color: var(--text); }
+  .title-row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .title-input { flex: 1; min-width: 220px; font-size: 22px; font-weight: 700; padding: 10px 12px; }
+  .cat-select { min-width: 200px; }
+  .editor-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+  #editor-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+
+  /* TinyMCE can get stuck with stale inline styles from its own async
+     "reveal" step, which collapses the editable area to 0 height.
+     Force the correct flex layout regardless of that internal state. */
+  .tox.tox-tinymce { display: flex !important; flex-direction: column !important; visibility: visible !important; }
+  .tox .tox-editor-container { display: flex !important; flex-direction: column !important; flex: 1 1 auto !important; min-height: 0 !important; }
+  .tox .tox-edit-area { flex: 1 1 auto !important; min-height: 0 !important; height: auto !important; }
+  .tox .tox-edit-area__iframe { height: 100% !important; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="editor-shell">
+  <a href="{% url 'notes_list' %}" class="back-link">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to notes
+  </a>
+
+  <div class="title-row">
+    <input type="text" id="titleInput" class="title-input" placeholder="Note title" maxlength="255">
+    <select id="categorySelect" class="cat-select">
+      <option value="">No category</option>
+      {% for c in categories %}
+        <option value="{{ c.name }}">{{ c.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div id="editor-wrap">
+    <textarea id="editor"></textarea>
+  </div>
+
+  <div class="editor-actions">
+    <a href="{% url 'notes_list' %}" class="btn">Cancel</a>
+    <button class="btn btn-primary" id="saveNoteBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+      Save note
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script src="{% static 'tinyMCE/tinymce.min.js' %}" referrerpolicy="origin"></script>
+<script>
+  window.__notexReloadOnTheme = true;
+
+  function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'dark';
+  }
+
+  tinymce.init({
+    selector: '#editor',
+    base_url: '{% static "tinyMCE/" %}',
+    suffix: '.min',
+    license_key: 'gpl',
+    height: 480,
+    menubar: false,
+    skin: currentTheme() === 'dark' ? 'oxide-dark' : 'oxide',
+    content_css: currentTheme() === 'dark' ? 'dark' : 'default',
+    plugins: 'lists link image code fullscreen table searchreplace autolink wordcount charmap advlist preview',
+    toolbar: 'undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | ' +
+             'alignleft aligncenter alignright | bullist numlist outdent indent | ' +
+             'link image table | code fullscreen preview',
+    branding: false,
+    promotion: false,
+    setup: (ed) => {
+      ed.on('init', () => {
+        const container = ed.getContainer();
+        if (container) container.style.visibility = 'visible';
+      });
+    },
+  });
+
+  document.getElementById('saveNoteBtn').addEventListener('click', async () => {
+    const title = document.getElementById('titleInput').value.trim();
+    if (!title) { showToast('Please enter a title', true); document.getElementById('titleInput').focus(); return; }
+    const content = tinymce.get('editor').getContent();
+    const category = document.getElementById('categorySelect').value;
+
+    const btn = document.getElementById('saveNoteBtn');
+    btn.disabled = true;
+    const res = await apiFetch('{% url "note_create_api" %}', {
+      method: 'POST',
+      body: JSON.stringify({ title, content, category }),
+    });
+    if (res.ok) {
+      window.location.href = `/notes/${res.id}/`;
+    } else {
+      showToast(res.error || 'Could not save note', true);
+      btn.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

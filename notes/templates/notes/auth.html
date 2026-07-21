@@ -1,0 +1,226 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NoteX &middot; Sign in</title>
+<script>
+  (function () {
+    var theme = localStorage.getItem('notex_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    // if a session token is already stored, skip straight to the app
+    if (localStorage.getItem('notex_token')) {
+      window.location.replace('{% url "notes_list" %}');
+    }
+  })();
+</script>
+<style>
+  @font-face {
+    font-family: 'Inter';
+    src: url('{% static "fonts/Inter-Regular.woff2" %}') format('woff2');
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Inter';
+    src: url('{% static "fonts/Inter-SemiBold.woff2" %}') format('woff2');
+    font-weight: 600; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Inter';
+    src: url('{% static "fonts/Inter-Bold.woff2" %}') format('woff2');
+    font-weight: 700; font-style: normal; font-display: swap;
+  }
+  :root {
+    --bg: #f6f4fc; --bg-elevated: #ffffff; --bg-hover: #eeebf9;
+    --border: #ddd7f1; --text: #1b1a24; --text-muted: #6b6779;
+    --accent: #7F77DD; --accent-hover: #6b62c9; --danger: #e0503c;
+    --shadow: 0 12px 32px rgba(70,60,120,0.14); --radius: 14px;
+  }
+  html[data-theme="dark"] {
+    --bg: #08080c; --bg-elevated: #0f0f16; --bg-hover: #1a1a24;
+    --border: #232430; --text: #e8e7f0; --text-muted: #8b889a;
+    --accent: #8f87e8; --accent-hover: #a49dee; --danger: #ef6252;
+    --shadow: 0 12px 32px rgba(0,0,0,0.6);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .icon { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .theme-toggle {
+    position: fixed; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .card {
+    width: 100%; max-width: 380px; background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px 28px;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; justify-content: center; font-weight: 700; font-size: 22px; margin-bottom: 4px; }
+  .brand .icon { width: 26px; height: 26px; color: var(--accent); }
+  .subtitle { text-align: center; color: var(--text-muted); font-size: 14px; margin: 0 0 24px; }
+  .tabs { display: flex; background: var(--bg-hover); border-radius: 10px; padding: 4px; margin-bottom: 22px; }
+  .tab { flex: 1; text-align: center; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-muted); transition: background .15s, color .15s; }
+  .tab.active { background: var(--bg-elevated); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  form { display: none; flex-direction: column; gap: 14px; }
+  form.active { display: flex; }
+  label { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block; }
+  input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 11px 12px; font-size: 14px; outline: none; transition: border-color .15s;
+  }
+  input:focus { border-color: var(--accent); }
+  .field-error { color: var(--danger); font-size: 12px; min-height: 16px; }
+  .submit-btn {
+    margin-top: 6px; background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 11px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .15s;
+  }
+  .submit-btn:hover { background: var(--accent-hover); }
+  .submit-btn:disabled { opacity: .6; cursor: default; }
+  .form-msg { font-size: 13px; text-align: center; min-height: 18px; color: var(--danger); }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" title="Toggle theme">
+  <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v1M12 20v1M4.2 4.2l.7.7M19.1 19.1l.7.7M3 12h1M20 12h1M4.2 19.8l.7-.7M19.1 4.9l.7-.7"/><circle cx="12" cy="12" r="4"/></svg>
+</button>
+
+<div class="card">
+  <div class="brand">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h12l4 4v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M16 4v4h4"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+    NoteX
+  </div>
+  <p class="subtitle">Your notes, organized.</p>
+
+  <div class="tabs">
+    <div class="tab active" data-target="loginForm" id="loginTab">Log in</div>
+    <div class="tab" data-target="signupForm" id="signupTab">Sign up</div>
+  </div>
+
+  <form id="loginForm" class="active">
+    {% csrf_token %}
+    <div>
+      <label for="loginUsername">Username</label>
+      <input type="text" id="loginUsername" autocomplete="username" required>
+    </div>
+    <div>
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" required>
+    </div>
+    <div class="form-msg" id="loginMsg"></div>
+    <button type="submit" class="submit-btn" id="loginSubmit">Log in</button>
+  </form>
+
+  <form id="signupForm">
+    {% csrf_token %}
+    <div>
+      <label for="signupUsername">Username</label>
+      <input type="text" id="signupUsername" autocomplete="username" required>
+    </div>
+    <div>
+      <label for="signupEmail">Email</label>
+      <input type="email" id="signupEmail" autocomplete="email" required>
+    </div>
+    <div>
+      <label for="signupPassword">Password</label>
+      <input type="password" id="signupPassword" autocomplete="new-password" required minlength="6">
+    </div>
+    <div class="form-msg" id="signupMsg"></div>
+    <button type="submit" class="submit-btn" id="signupSubmit">Create account</button>
+  </form>
+</div>
+
+<script>
+  function getCookie(name) {
+    const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return v ? v.pop() : '';
+  }
+
+  const themeToggle = document.getElementById('themeToggle');
+  themeToggle.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('notex_theme', next);
+  });
+
+  const tabs = document.querySelectorAll('.tab');
+  const forms = document.querySelectorAll('form');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      forms.forEach(f => f.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.target).classList.add('active');
+    });
+  });
+
+  function setSession(username, token) {
+    localStorage.setItem('notex_token', token || ('session-' + Date.now()));
+    localStorage.setItem('notex_username', username);
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('loginMsg');
+    const btn = document.getElementById('loginSubmit');
+    msg.textContent = '';
+    btn.disabled = true;
+    try {
+      const res = await fetch('{% url "login_api" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({
+          username: document.getElementById('loginUsername').value,
+          password: document.getElementById('loginPassword').value,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSession(data.username, data.token);
+        window.location.href = '{% url "notes_list" %}';
+      } else {
+        msg.textContent = data.error || 'Login failed.';
+      }
+    } catch (err) {
+      msg.textContent = 'Network error. Please try again.';
+    }
+    btn.disabled = false;
+  });
+
+  document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('signupMsg');
+    const btn = document.getElementById('signupSubmit');
+    msg.textContent = '';
+    btn.disabled = true;
+    try {
+      const res = await fetch('{% url "signup_api" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({
+          username: document.getElementById('signupUsername').value,
+          email: document.getElementById('signupEmail').value,
+          password: document.getElementById('signupPassword').value,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSession(data.username, data.token);
+        window.location.href = '{% url "notes_list" %}';
+      } else {
+        msg.textContent = data.error || 'Sign up failed.';
+      }
+    } catch (err) {
+      msg.textContent = 'Network error. Please try again.';
+    }
+    btn.disabled = false;
+  });
+</script>
+</body>
+</html>

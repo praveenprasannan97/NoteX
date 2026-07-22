@@ -4,7 +4,13 @@
 
 {% block extra_head %}
 <style>
-  .editor-shell { flex: 1; padding: 24px; max-width: 960px; margin: 0 auto; width: 100%; }
+  .editor-shell { padding: 24px; margin: 0 auto; width: 90%; }
+  @media (max-width: 900px) {
+    .editor-shell { width: 94%; padding: 20px; }
+  }
+  @media (max-width: 720px) {
+    .editor-shell { width: 100%; padding: 14px; }
+  }
   .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-size: 14px; margin-bottom: 14px; }
   .back-link:hover { color: var(--text); }
   .title-row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
@@ -62,16 +68,44 @@
   function currentTheme() {
     return document.documentElement.getAttribute('data-theme') || 'dark';
   }
+  function themeVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  function themedContentStyle() {
+    const bg = themeVar('--bg-elevated');
+    const text = themeVar('--text');
+    const accent = themeVar('--accent');
+    const border = themeVar('--border');
+    return `
+      body { background: ${bg}; color: ${text}; }
+      a { color: ${accent}; }
+      ::selection { background: ${accent}55; }
+      table td, table th { border-color: ${border}; }
+      blockquote { border-left-color: ${accent}; color: ${text}; opacity: .85; }
+      code { background: ${border}; }
+    `;
+  }
+
+  function computeEditorHeight(el, reserve) {
+    const rect = el.getBoundingClientRect();
+    const available = window.innerHeight - rect.top - (reserve || 24);
+    return Math.max(320, Math.round(available));
+  }
+
+  const editorEl = document.getElementById('editor');
+  const actionsEl = document.querySelector('.editor-actions');
+  const reserveBelow = (actionsEl ? actionsEl.offsetHeight : 0) + 40;
 
   tinymce.init({
     selector: '#editor',
     base_url: '{% static "tinyMCE/" %}',
     suffix: '.min',
     license_key: 'gpl',
-    height: 480,
+    height: computeEditorHeight(editorEl, reserveBelow),
     menubar: false,
     skin: currentTheme() === 'dark' ? 'oxide-dark' : 'oxide',
     content_css: currentTheme() === 'dark' ? 'dark' : 'default',
+    content_style: themedContentStyle(),
     plugins: 'lists link image code fullscreen table searchreplace autolink wordcount charmap advlist preview',
     toolbar: 'undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | ' +
              'alignleft aligncenter alignright | bullist numlist outdent indent | ' +

@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST, require_GET
 
 from .models import Category, Note
 
-MAX_PAGES = 5
+MAX_PAGES = 10
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +167,11 @@ def notes_fetch_api(request):
             | Q(content3__icontains=q)
             | Q(content4__icontains=q)
             | Q(content5__icontains=q)
+            | Q(content6__icontains=q)
+            | Q(content7__icontains=q)
+            | Q(content8__icontains=q)
+            | Q(content9__icontains=q)
+            | Q(content10__icontains=q)
         )
 
     if category:
@@ -257,7 +262,7 @@ def note_page_update_api(request, note_id, page_number):
 def note_page_add_api(request, note_id):
     note = get_object_or_404(Note, id=note_id, user=request.user)
     if note.num_pages >= MAX_PAGES:
-        return JsonResponse({'ok': False, 'error': 'Maximum of 5 pages reached.'}, status=400)
+        return JsonResponse({'ok': False, 'error': f'Maximum of {MAX_PAGES} pages reached.'}, status=400)
     note.num_pages += 1
     note.set_page_content(note.num_pages, '')
     note.save()

@@ -82,7 +82,7 @@
     display: inline-flex; align-items: center; gap: 6px;
     padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--bg-elevated); color: var(--text); cursor: pointer;
-    font-size: 14px; font-weight: 500; transition: background .15s, border-color .15s, transform .1s;
+    font-size: 14px; font-weight: 500; text-decoration: none; transition: background .15s, border-color .15s, transform .1s;
   }
   .btn:hover { background: var(--bg-hover); }
   .btn:active { transform: scale(0.97); }
@@ -190,6 +190,36 @@
     .search-wrap > svg.icon { left: 8px; width: 15px; height: 15px; }
     .search-clear { width: 24px; height: 24px; right: 2px; }
   }
+
+  /* ---- TinyMCE chrome recolored to match the app theme (both modes,
+     since these map to CSS vars that already flip with data-theme) ---- */
+  .tox.tox-tinymce { border-color: var(--border) !important; }
+  .tox .tox-editor-header { background-color: var(--bg-elevated) !important; border-bottom: 1px solid var(--border) !important; box-shadow: none !important; }
+  .tox .tox-toolbar, .tox .tox-toolbar__primary, .tox .tox-toolbar-overlord, .tox .tox-toolbar__overflow { background: var(--bg-elevated) !important; }
+  .tox .tox-toolbar__group { border-color: var(--border) !important; }
+  .tox .tox-tbtn { color: var(--text) !important; }
+  .tox .tox-tbtn svg { fill: var(--text) !important; }
+  .tox .tox-tbtn:hover { background: var(--bg-hover) !important; }
+  .tox .tox-tbtn--enabled, .tox .tox-tbtn--enabled:hover { background: var(--accent) !important; }
+  .tox .tox-tbtn--enabled, .tox .tox-tbtn--enabled svg { color: #fff !important; fill: #fff !important; }
+  .tox .tox-tbtn--select { color: var(--text) !important; }
+  .tox .tox-split-button:hover { box-shadow: 0 0 0 1px var(--border) inset !important; }
+  .tox .tox-statusbar { background: var(--bg-elevated) !important; border-top: 1px solid var(--border) !important; color: var(--text-muted) !important; }
+  .tox .tox-statusbar a, .tox .tox-statusbar__path-item, .tox .tox-statusbar__wordcount, .tox .tox-statusbar__branding { color: var(--text-muted) !important; }
+  .tox .tox-menu, .tox .tox-collection { background: var(--bg-elevated) !important; border-color: var(--border) !important; }
+  .tox .tox-collection__item { color: var(--text) !important; }
+  .tox .tox-collection__item--active, .tox .tox-collection__item--enabled { background: var(--bg-hover) !important; }
+  .tox .tox-collection__item-label, .tox .tox-collection__item-caret svg { color: var(--text) !important; fill: var(--text) !important; }
+  .tox .tox-selectfield select, .tox .tox-textfield, .tox .tox-toolbar-textfield, .tox .tox-listboxfield .tox-listbox { background: var(--bg-elevated) !important; color: var(--text) !important; border-color: var(--border) !important; }
+  .tox .tox-dialog { background: var(--bg-elevated) !important; color: var(--text) !important; border-color: var(--border) !important; }
+  .tox .tox-dialog__header, .tox .tox-dialog__footer { background: var(--bg-elevated) !important; border-color: var(--border) !important; color: var(--text) !important; }
+  .tox .tox-dialog__body-nav-item--active { border-color: var(--accent) !important; color: var(--accent) !important; }
+  .tox .tox-dialog__title, .tox .tox-label, .tox .tox-form__group { color: var(--text) !important; }
+  .tox .tox-button { background: var(--accent) !important; border-color: var(--accent) !important; }
+  .tox .tox-button:hover { background: var(--accent-hover) !important; border-color: var(--accent-hover) !important; }
+  .tox .tox-button--secondary { background: var(--bg-hover) !important; color: var(--text) !important; border-color: var(--border) !important; }
+  .tox .tox-dialog-wrap__backdrop { background: rgba(0,0,0,.55) !important; }
+  .tox .tox-edit-area { border-color: var(--border) !important; }
 </style>
 {% block extra_head %}{% endblock %}
 </head>
@@ -268,6 +298,18 @@ async function apiFetch(url, options = {}) {
   try { data = await res.json(); } catch (e) { /* ignore */ }
   if (!res.ok && !data.error) data.error = 'Something went wrong. Please try again.';
   return data;
+}
+
+/* ---- local-time display helper ----
+   The server always stores/sends UTC. This only affects how it's shown,
+   using whatever timezone the browser/OS is set to. */
+function formatLocalDateTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+function formatLocalDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function showToast(message, isError) {

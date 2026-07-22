@@ -24,6 +24,11 @@ class Note(models.Model):
     content3 = models.TextField(blank=True, default='')
     content4 = models.TextField(blank=True, default='')
     content5 = models.TextField(blank=True, default='')
+    content6 = models.TextField(blank=True, default='')
+    content7 = models.TextField(blank=True, default='')
+    content8 = models.TextField(blank=True, default='')
+    content9 = models.TextField(blank=True, default='')
+    content10 = models.TextField(blank=True, default='')
     num_pages = models.PositiveSmallIntegerField(default=1)
 
     # Stored as plain text (NOT a foreign key) so deleting a category

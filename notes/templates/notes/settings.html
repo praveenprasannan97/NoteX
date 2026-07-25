@@ -1,15 +1,430 @@
 {% extends "notes/base.html" %}
+{% load static %}
 {% block title %}NoteX &middot; Settings{% endblock %}
+
 {% block extra_head %}
 <style>
-  .settings-shell { flex: 1; padding: 40px 24px; max-width: 640px; margin: 0 auto; width: 100%; text-align: center; }
-  .settings-shell svg { width: 56px; height: 56px; color: var(--text-muted); margin-bottom: 16px; }
-  .settings-shell h2 { margin: 0 0 8px; }
-  .settings-shell p { color: var(--text-muted); }
+  .settings-shell { flex: 1; padding: 24px; max-width: 1000px; margin: 0 auto; width: 90%; }
+  @media (max-width: 1100px) { .settings-shell { width: 94%; } }
+  @media (max-width: 720px) { .settings-shell { width: 100%; padding: 14px; } }
+
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-size: 14px; margin-bottom: 18px; }
+  .back-link:hover { color: var(--text); }
+
+  .settings-shell h1 { font-size: 24px; margin: 0 0 20px; }
+
+  .settings-group { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
+  .settings-group-title { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); font-weight: 700; padding: 14px 18px 4px; }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 18px 20px; border-top: 1px solid var(--border);
+  }
+  .settings-row:first-of-type { border-top: none; }
+  .settings-row .info h4 { margin: 0 0 3px; font-size: 15px; }
+  .settings-row .info p { margin: 0; font-size: 13px; color: var(--text-muted); }
+  .settings-row .btn { flex-shrink: 0; width: 190px; justify-content: center; }
+  @media (max-width: 560px) { .settings-row .btn { width: auto; } }
+
+  .settings-group.danger { border-color: var(--danger); }
+  .settings-group.danger .settings-group-title { color: var(--danger); }
+
+  /* forms inside modals */
+  .modal.wide { max-width: 460px; }
+  .form-field { margin-bottom: 14px; }
+  .form-field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .form-field input[type="text"], .form-field input[type="password"] { width: 100%; }
+  .field-error { color: var(--danger); font-size: 12px; min-height: 16px; margin-top: 4px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 14px 0; }
+  .checkbox-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+  .dropzone {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 28px 16px; text-align: center;
+    cursor: pointer; color: var(--text-muted); transition: border-color .15s, background .15s;
+  }
+  .dropzone.drag-over { border-color: var(--accent); background: var(--bg-hover); color: var(--text); }
+  .dropzone svg { width: 30px; height: 30px; margin-bottom: 8px; }
+  .dropzone .filename { margin-top: 8px; font-size: 13px; color: var(--text); font-weight: 600; word-break: break-all; }
+
+  .type-confirm-input { width: 100%; margin-top: 10px; }
 </style>
 {% endblock %}
+
 {% block body %}
 <div class="settings-shell">
-  <h2>Settings</h2>
+  <a href="{% url 'notes_list' %}" class="back-link">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to notes
+  </a>
+
+  <h1>Settings</h1>
+
+  <div class="settings-group">
+    <div class="settings-group-title">Account</div>
+    <div class="settings-row">
+      <div class="info">
+        <h4>Password</h4>
+        <p>Change the password used to log in to NoteX.</p>
+      </div>
+      <button class="btn" id="openChangePasswordBtn">Update password</button>
+    </div>
+  </div>
+
+  <div class="settings-group">
+    <div class="settings-group-title">Your data</div>
+    <div class="settings-row">
+      <div class="info">
+        <h4>Export notes</h4>
+        <p>Download all your notes and categories as a CSV file.</p>
+      </div>
+      <button class="btn" id="openExportBtn">Export all notes</button>
+    </div>
+    <div class="settings-row">
+      <div class="info">
+        <h4>Import notes</h4>
+        <p>Restore notes and categories from a previously exported CSV file.</p>
+      </div>
+      <button class="btn" id="openImportBtn">Import notes</button>
+    </div>
+  </div>
+
+  <div class="settings-group danger">
+    <div class="settings-group-title">Danger zone</div>
+    <div class="settings-row">
+      <div class="info">
+        <h4>Delete all notes</h4>
+        <p>Permanently delete every note and category in your account. This cannot be undone.</p>
+      </div>
+      <button class="btn btn-danger" id="openDeleteAllBtn">Delete all notes</button>
+    </div>
+    <div class="settings-row">
+      <div class="info">
+        <h4>Delete account</h4>
+        <p>Permanently delete your account and all associated data. This cannot be undone.</p>
+      </div>
+      <button class="btn btn-danger" id="openDeleteAccountBtn">Delete account</button>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_body %}
+
+<!-- Change password modal -->
+<div class="modal-overlay" id="pwModalOverlay">
+  <div class="modal wide">
+    <h3>Update password</h3>
+    <p>Choose a new password for your account.</p>
+    <div class="form-field">
+      <label for="currentPasswordInput">Current password</label>
+      <input type="password" id="currentPasswordInput" autocomplete="current-password">
+    </div>
+    <div class="form-field">
+      <label for="newPasswordInput">New password</label>
+      <input type="password" id="newPasswordInput" autocomplete="new-password" minlength="6">
+    </div>
+    <div class="form-field">
+      <label for="confirmPasswordInput">Confirm new password</label>
+      <input type="password" id="confirmPasswordInput" autocomplete="new-password" minlength="6">
+    </div>
+    <div class="field-error" id="pwError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="pwCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="pwSaveBtn">Update password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import notes modal -->
+<div class="modal-overlay" id="importModalOverlay">
+  <div class="modal wide">
+    <h3>Import notes</h3>
+    <p>Upload a CSV file exported from NoteX.</p>
+
+    <div class="dropzone" id="dropzone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      <div>Drag &amp; drop your CSV file here, or click to browse</div>
+      <div class="filename" id="importFilename"></div>
+    </div>
+    <input type="file" id="importFileInput" accept=".csv,text/csv" style="display:none">
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="importOriginalDatesCheck" checked>
+      <label for="importOriginalDatesCheck">Import original date and time from the file</label>
+    </div>
+
+    <div class="field-error" id="importError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="importCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="importSubmitBtn" disabled>Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete all notes modal: step 1 (typed confirmation) -->
+<div class="modal-overlay" id="deleteAllModalOverlay">
+  <div class="modal wide">
+    <h3>Delete all notes?</h3>
+    <p>This permanently deletes every note and category in your account. This cannot be undone. Type <strong>DELETE ALL NOTES</strong> to continue.</p>
+    <input type="text" id="deleteAllInput" class="type-confirm-input" placeholder="DELETE ALL NOTES" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn" id="deleteAllCancelBtn">Cancel</button>
+      <button class="btn btn-danger" id="deleteAllContinueBtn" disabled>Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete all notes modal: step 2 (verify credentials) -->
+<div class="modal-overlay" id="deleteAllStep2Overlay">
+  <div class="modal wide">
+    <h3>Confirm your identity</h3>
+    <p>Enter your username and password to permanently delete all notes and categories.</p>
+    <div class="form-field">
+      <label for="deleteAllUsername">Username</label>
+      <input type="text" id="deleteAllUsername" autocomplete="username">
+    </div>
+    <div class="form-field">
+      <label for="deleteAllPassword">Password</label>
+      <input type="password" id="deleteAllPassword" autocomplete="current-password">
+    </div>
+    <div class="field-error" id="deleteAllStep2Error"></div>
+    <div class="modal-actions">
+      <button class="btn" id="deleteAllStep2CancelBtn">Cancel</button>
+      <button class="btn btn-danger" id="deleteAllStep2ConfirmBtn">Delete all notes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete account modal: step 1 (typed confirmation) -->
+<div class="modal-overlay" id="deleteAcctStep1Overlay">
+  <div class="modal wide">
+    <h3>Delete your account?</h3>
+    <p>This permanently deletes your account and all associated notes and categories. This cannot be undone. Type <strong>DELETE MY ACCOUNT</strong> to continue.</p>
+    <input type="text" id="deleteAcctStep1Input" class="type-confirm-input" placeholder="DELETE MY ACCOUNT" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn" id="deleteAcctStep1CancelBtn">Cancel</button>
+      <button class="btn btn-danger" id="deleteAcctStep1ContinueBtn" disabled>Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete account modal: step 2 (verify credentials) -->
+<div class="modal-overlay" id="deleteAcctStep2Overlay">
+  <div class="modal wide">
+    <h3>Confirm your identity</h3>
+    <p>Enter your username and password to permanently delete your account.</p>
+    <div class="form-field">
+      <label for="deleteAcctUsername">Username</label>
+      <input type="text" id="deleteAcctUsername" autocomplete="username">
+    </div>
+    <div class="form-field">
+      <label for="deleteAcctPassword">Password</label>
+      <input type="password" id="deleteAcctPassword" autocomplete="current-password">
+    </div>
+    <div class="field-error" id="deleteAcctError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="deleteAcctStep2CancelBtn">Cancel</button>
+      <button class="btn btn-danger" id="deleteAcctStep2ConfirmBtn">Delete my account</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+/* ================= change password ================= */
+document.getElementById('openChangePasswordBtn').addEventListener('click', () => {
+  document.getElementById('currentPasswordInput').value = '';
+  document.getElementById('newPasswordInput').value = '';
+  document.getElementById('confirmPasswordInput').value = '';
+  document.getElementById('pwError').textContent = '';
+  openModal('pwModalOverlay');
+});
+document.getElementById('pwCancelBtn').addEventListener('click', () => closeModal('pwModalOverlay'));
+document.getElementById('pwSaveBtn').addEventListener('click', async () => {
+  const currentPassword = document.getElementById('currentPasswordInput').value;
+  const newPassword = document.getElementById('newPasswordInput').value;
+  const confirmPassword = document.getElementById('confirmPasswordInput').value;
+  const errEl = document.getElementById('pwError');
+  errEl.textContent = '';
+
+  if (!currentPassword) { errEl.textContent = 'Enter your current password.'; return; }
+  if (newPassword.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+  if (newPassword !== confirmPassword) { errEl.textContent = 'Passwords do not match.'; return; }
+
+  const res = await apiFetch('{% url "change_password_api" %}', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword, confirm_password: confirmPassword }),
+  });
+  if (res.ok) {
+    closeModal('pwModalOverlay');
+    showToast('Password updated');
+  } else {
+    errEl.textContent = res.error || 'Could not update password.';
+  }
+});
+
+/* ================= export ================= */
+document.getElementById('openExportBtn').addEventListener('click', () => {
+  confirmAction({
+    title: 'Export all notes?',
+    message: 'This downloads a CSV file containing all of your notes and categories.',
+    confirmLabel: 'Export',
+    onConfirm: () => { window.location.href = '{% url "export_notes_api" %}'; },
+  });
+});
+
+/* ================= import ================= */
+let importFile = null;
+const dropzone = document.getElementById('dropzone');
+const importFileInput = document.getElementById('importFileInput');
+const importSubmitBtn = document.getElementById('importSubmitBtn');
+const importFilename = document.getElementById('importFilename');
+
+document.getElementById('openImportBtn').addEventListener('click', () => {
+  importFile = null;
+  importFileInput.value = '';
+  importFilename.textContent = '';
+  importSubmitBtn.disabled = true;
+  document.getElementById('importError').textContent = '';
+  document.getElementById('importOriginalDatesCheck').checked = true;
+  openModal('importModalOverlay');
+});
+document.getElementById('importCancelBtn').addEventListener('click', () => closeModal('importModalOverlay'));
+
+function setImportFile(file) {
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    document.getElementById('importError').textContent = 'Please choose a .csv file.';
+    return;
+  }
+  importFile = file;
+  importFilename.textContent = file.name;
+  importSubmitBtn.disabled = false;
+  document.getElementById('importError').textContent = '';
+}
+
+dropzone.addEventListener('click', () => importFileInput.click());
+importFileInput.addEventListener('change', () => setImportFile(importFileInput.files[0]));
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) setImportFile(e.dataTransfer.files[0]);
+});
+
+document.getElementById('importSubmitBtn').addEventListener('click', async () => {
+  if (!importFile) return;
+  const errEl = document.getElementById('importError');
+  errEl.textContent = '';
+  const btn = document.getElementById('importSubmitBtn');
+  btn.disabled = true;
+
+  const formData = new FormData();
+  formData.append('file', importFile);
+  formData.append('import_original_dates', document.getElementById('importOriginalDatesCheck').checked ? 'true' : 'false');
+
+  try {
+    const res = await fetch('{% url "import_notes_api" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF_TOKEN },
+      body: formData,
+    });
+    const data = await res.json();
+    if (data.ok) {
+      closeModal('importModalOverlay');
+      showToast(`Imported ${data.notes_imported} note${data.notes_imported === 1 ? '' : 's'} and ${data.categories_imported} categor${data.categories_imported === 1 ? 'y' : 'ies'}`);
+    } else {
+      errEl.textContent = data.error || 'Could not import the file.';
+    }
+  } catch (e) {
+    errEl.textContent = 'Network error. Please try again.';
+  }
+  btn.disabled = false;
+});
+
+/* ================= delete all notes ================= */
+document.getElementById('openDeleteAllBtn').addEventListener('click', () => {
+  document.getElementById('deleteAllInput').value = '';
+  document.getElementById('deleteAllContinueBtn').disabled = true;
+  openModal('deleteAllModalOverlay');
+});
+document.getElementById('deleteAllCancelBtn').addEventListener('click', () => closeModal('deleteAllModalOverlay'));
+document.getElementById('deleteAllInput').addEventListener('input', (e) => {
+  document.getElementById('deleteAllContinueBtn').disabled = e.target.value !== 'DELETE ALL NOTES';
+});
+document.getElementById('deleteAllContinueBtn').addEventListener('click', () => {
+  closeModal('deleteAllModalOverlay');
+  document.getElementById('deleteAllUsername').value = '';
+  document.getElementById('deleteAllPassword').value = '';
+  document.getElementById('deleteAllStep2Error').textContent = '';
+  openModal('deleteAllStep2Overlay');
+});
+document.getElementById('deleteAllStep2CancelBtn').addEventListener('click', () => closeModal('deleteAllStep2Overlay'));
+document.getElementById('deleteAllStep2ConfirmBtn').addEventListener('click', async () => {
+  const username = document.getElementById('deleteAllUsername').value.trim();
+  const password = document.getElementById('deleteAllPassword').value;
+  const errEl = document.getElementById('deleteAllStep2Error');
+  errEl.textContent = '';
+
+  if (!username || !password) { errEl.textContent = 'Enter your username and password.'; return; }
+
+  const btn = document.getElementById('deleteAllStep2ConfirmBtn');
+  btn.disabled = true;
+  const res = await apiFetch('{% url "delete_all_notes_api" %}', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  if (res.ok) {
+    closeModal('deleteAllStep2Overlay');
+    showToast('All notes and categories deleted');
+  } else {
+    errEl.textContent = res.error || 'Could not delete notes.';
+  }
+  btn.disabled = false;
+});
+
+/* ================= delete account ================= */
+document.getElementById('openDeleteAccountBtn').addEventListener('click', () => {
+  document.getElementById('deleteAcctStep1Input').value = '';
+  document.getElementById('deleteAcctStep1ContinueBtn').disabled = true;
+  openModal('deleteAcctStep1Overlay');
+});
+document.getElementById('deleteAcctStep1CancelBtn').addEventListener('click', () => closeModal('deleteAcctStep1Overlay'));
+document.getElementById('deleteAcctStep1Input').addEventListener('input', (e) => {
+  document.getElementById('deleteAcctStep1ContinueBtn').disabled = e.target.value !== 'DELETE MY ACCOUNT';
+});
+document.getElementById('deleteAcctStep1ContinueBtn').addEventListener('click', () => {
+  closeModal('deleteAcctStep1Overlay');
+  document.getElementById('deleteAcctUsername').value = '';
+  document.getElementById('deleteAcctPassword').value = '';
+  document.getElementById('deleteAcctError').textContent = '';
+  openModal('deleteAcctStep2Overlay');
+});
+document.getElementById('deleteAcctStep2CancelBtn').addEventListener('click', () => closeModal('deleteAcctStep2Overlay'));
+document.getElementById('deleteAcctStep2ConfirmBtn').addEventListener('click', async () => {
+  const username = document.getElementById('deleteAcctUsername').value.trim();
+  const password = document.getElementById('deleteAcctPassword').value;
+  const errEl = document.getElementById('deleteAcctError');
+  errEl.textContent = '';
+
+  if (!username || !password) { errEl.textContent = 'Enter your username and password.'; return; }
+
+  const btn = document.getElementById('deleteAcctStep2ConfirmBtn');
+  btn.disabled = true;
+  const res = await apiFetch('{% url "delete_account_api" %}', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  if (res.ok) {
+    localStorage.removeItem('notex_token');
+    localStorage.removeItem('notex_username');
+    window.location.href = '{% url "auth" %}';
+  } else {
+    errEl.textContent = res.error || 'Could not delete account.';
+    btn.disabled = false;
+  }
+});
+</script>
 {% endblock %}

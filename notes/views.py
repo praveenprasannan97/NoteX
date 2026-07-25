@@ -1,18 +1,24 @@
+import csv
+import io
 import json
 
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db import IntegrityError
 from django.db.models import Q
-from django.http import JsonResponse, HttpResponseNotAllowed
+from django.http import JsonResponse, HttpResponseNotAllowed, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST, require_GET
 
 from .models import Category, Note
 
 MAX_PAGES = 10
+CSV_NOTE_FIELDS = ['title', 'category', 'num_pages', 'created_at', 'updated_at'] + \
+                   [f'content{i}' for i in range(1, MAX_PAGES + 1)]
 
 
 # ---------------------------------------------------------------------------
@@ -325,3 +331,163 @@ def category_delete_api(request, category_id):
     # Notes keep their category text (plain text field) even after the
     # category record is removed, by design.
     return JsonResponse({'ok': True, 'name': name})
+
+
+# ---------------------------------------------------------------------------
+# account management (settings page)
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='/')
+@require_POST
+def change_password_api(request):
+    data = _json_body(request)
+    current_password = data.get('current_password') or ''
+    new_password = data.get('new_password') or ''
+    confirm_password = data.get('confirm_password') or ''
+
+    if not request.user.check_password(current_password):
+        return JsonResponse({'ok': False, 'error': 'Current password is incorrect.'}, status=400)
+    if len(new_password) < 6:
+        return JsonResponse({'ok': False, 'error': 'Password must be at least 6 characters.'}, status=400)
+    if new_password != confirm_password:
+        return JsonResponse({'ok': False, 'error': 'Passwords do not match.'}, status=400)
+
+    request.user.set_password(new_password)
+    request.user.save()
+    # Keep the current session valid after the password hash changes.
+    update_session_auth_hash(request, request.user)
+    return JsonResponse({'ok': True})
+
+
+@login_required(login_url='/')
+@require_GET
+def export_notes_api(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="notex_export.csv"'
+
+    writer = csv.writer(response)
+
+    category_names = list(
+        Category.objects.filter(user=request.user).order_by('name').values_list('name', flat=True)
+    )
+    writer.writerow(category_names)
+    writer.writerow([])
+    writer.writerow(CSV_NOTE_FIELDS)
+
+    for note in Note.objects.filter(user=request.user).order_by('id'):
+        row = [note.title, note.category, note.num_pages,
+               note.created_at.isoformat(), note.updated_at.isoformat()]
+        row += [note.get_page_content(i) for i in range(1, MAX_PAGES + 1)]
+        writer.writerow(row)
+
+    return response
+
+
+def _parse_csv_datetime(value):
+    value = (value or '').strip()
+    if not value:
+        return None
+    dt = parse_datetime(value)
+    if dt is None:
+        return None
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.utc)
+    return dt
+
+
+@login_required(login_url='/')
+@require_POST
+def import_notes_api(request):
+    upload = request.FILES.get('file')
+    if not upload:
+        return JsonResponse({'ok': False, 'error': 'No file was uploaded.'}, status=400)
+
+    keep_original_dates = (request.POST.get('import_original_dates') or '').lower() in ('true', '1', 'on')
+
+    try:
+        text = upload.read().decode('utf-8-sig')
+    except UnicodeDecodeError:
+        return JsonResponse({'ok': False, 'error': 'Could not read the file. Please upload a UTF-8 CSV.'}, status=400)
+
+    rows = list(csv.reader(io.StringIO(text)))
+    if len(rows) < 3:
+        return JsonResponse({'ok': False, 'error': 'This does not look like a NoteX export file.'}, status=400)
+
+    category_row = rows[0]
+    note_rows = rows[3:]  # row 1 = categories, row 2 = blank, row 3 = header
+
+    categories_imported = 0
+    for name in category_row:
+        name = name.strip()
+        if not name:
+            continue
+        _, created = Category.objects.get_or_create(user=request.user, name=name)
+        if created:
+            categories_imported += 1
+
+    notes_imported = 0
+    for row in note_rows:
+        if len(row) < 5:
+            continue  # skip malformed / short rows
+
+        title = (row[0] or 'Untitled Note').strip() or 'Untitled Note'
+        category = (row[1] or '').strip()
+        try:
+            num_pages = max(1, min(MAX_PAGES, int(row[2])))
+        except (ValueError, IndexError):
+            num_pages = 1
+
+        contents = row[5:5 + MAX_PAGES]
+        contents += [''] * (MAX_PAGES - len(contents))
+
+        note = Note.objects.create(
+            user=request.user,
+            title=title,
+            category=category,
+            num_pages=num_pages,
+            **{f'content{i}': contents[i - 1] for i in range(1, MAX_PAGES + 1)},
+        )
+
+        if keep_original_dates:
+            created_at = _parse_csv_datetime(row[3] if len(row) > 3 else '') or timezone.now()
+            updated_at = _parse_csv_datetime(row[4] if len(row) > 4 else '') or created_at
+            # auto_now_add/auto_now always override on save(), so force the
+            # original timestamps with a direct update() afterwards.
+            Note.objects.filter(pk=note.pk).update(created_at=created_at, updated_at=updated_at)
+
+        notes_imported += 1
+
+    return JsonResponse({'ok': True, 'notes_imported': notes_imported, 'categories_imported': categories_imported})
+
+
+@login_required(login_url='/')
+@require_POST
+def delete_all_notes_api(request):
+    data = _json_body(request)
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+
+    user_check = authenticate(request, username=username, password=password)
+    if user_check is None or user_check.pk != request.user.pk:
+        return JsonResponse({'ok': False, 'error': 'Username or password is incorrect.'}, status=400)
+
+    Note.objects.filter(user=request.user).delete()
+    Category.objects.filter(user=request.user).delete()
+    return JsonResponse({'ok': True})
+
+
+@login_required(login_url='/')
+@require_POST
+def delete_account_api(request):
+    data = _json_body(request)
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+
+    user_check = authenticate(request, username=username, password=password)
+    if user_check is None or user_check.pk != request.user.pk:
+        return JsonResponse({'ok': False, 'error': 'Username or password is incorrect.'}, status=400)
+
+    user = request.user
+    logout(request)
+    user.delete()  # cascades to Notes and Categories via on_delete=CASCADE
+    return JsonResponse({'ok': True})

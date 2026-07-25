@@ -24,4 +24,10 @@ urlpatterns = [
 
     path('api/categories/', views.categories_api, name='categories_api'),
     path('api/categories/<int:category_id>/delete/', views.category_delete_api, name='category_delete_api'),
+
+    path('api/account/change-password/', views.change_password_api, name='change_password_api'),
+    path('api/account/export/', views.export_notes_api, name='export_notes_api'),
+    path('api/account/import/', views.import_notes_api, name='import_notes_api'),
+    path('api/account/delete-all-notes/', views.delete_all_notes_api, name='delete_all_notes_api'),
+    path('api/account/delete/', views.delete_account_api, name='delete_account_api'),
 ]

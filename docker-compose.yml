@@ -1,0 +1,14 @@
+services:
+  linker:
+    image: notex:latest
+    container_name: notex
+    restart: unless-stopped
+    ports:
+      - "5332:8000"
+    volumes:
+      # Maps the container's /app/db to your Portainer data folder on the Pi
+      - /portainer/Files/AppData/Config/NoteX:/app/db
+    environment:
+      - SECRET_KEY=)5xr_xg3cb=7m+6q%o$amsw5f#1x$5h1j1suli2q)4bxedw126
+      - DEBUG=False
+      - ALLOWED_HOSTS=*

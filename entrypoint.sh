@@ -12,7 +12,7 @@ su -s /bin/sh appuser -c "python manage.py migrate --noinput"
 
 echo "Starting Gunicorn..."
 exec su -s /bin/sh appuser -c "
-    gunicorn notex.wsgi.application \
+    gunicorn notex.wsgi:application \
         --bind 0.0.0.0:8000 \
         --workers 1 \
         --threads 1 \

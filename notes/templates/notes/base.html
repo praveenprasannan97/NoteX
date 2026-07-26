@@ -278,7 +278,7 @@ function getCookie(name) {
   const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
   return v ? v.pop() : '';
 }
-const CSRF_TOKEN = getCookie('csrftoken');
+const CSRF_TOKEN = getCookie('notex_csrftoken');
 
 /* ---- keep --nav-h in sync with the actual (possibly wrapped) nav height ---- */
 function updateNavHeightVar() {

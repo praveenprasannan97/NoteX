@@ -128,3 +128,10 @@ LOGIN_URL = '/'
 
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14  # 2 weeks
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Cookies are scoped by domain but NOT by port, so a generic 'sessionid'/
+# 'csrftoken' cookie can collide with another app running on the same
+# hostname at a different port, silently overwriting each other's session.
+# Unique names keep NoteX isolated regardless of what else shares the host.
+SESSION_COOKIE_NAME = 'notex_sessionid'
+CSRF_COOKIE_NAME = 'notex_csrftoken'

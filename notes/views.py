@@ -108,6 +108,15 @@ def logout_view(request):
     return redirect('auth')
 
 
+def session_check_api(request):
+    # Deliberately not @login_required: that decorator redirects on failure,
+    # which the login page can't use to safely decide whether to redirect
+    # itself. This always answers with plain JSON instead.
+    if request.user.is_authenticated:
+        return JsonResponse({'ok': True, 'username': request.user.username})
+    return JsonResponse({'ok': False}, status=401)
+
+
 # ---------------------------------------------------------------------------
 # pages
 # ---------------------------------------------------------------------------

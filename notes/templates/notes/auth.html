@@ -9,10 +9,32 @@
   (function () {
     var theme = localStorage.getItem('notex_theme') || 'dark';
     document.documentElement.setAttribute('data-theme', theme);
-    // if a session token is already stored, skip straight to the app
-    if (localStorage.getItem('notex_token')) {
-      window.location.replace('{% url "notes_list" %}');
+  })();
+
+  // If a session token is stored, verify it against the server before
+  // redirecting. Never trust it blindly: localStorage can be stale (an
+  // expired session, a cleared server-side session, or - if this host
+  // also runs another app on a different port - a cookie collision,
+  // since cookies are scoped by domain but not by port). Redirecting
+  // without checking is what causes an infinite reload loop when the
+  // token doesn't actually correspond to a valid session.
+  (async function checkExistingSession() {
+    if (!localStorage.getItem('notex_token')) return;
+    try {
+      const res = await fetch('{% url "session_check_api" %}', { credentials: 'same-origin' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok) {
+          window.location.replace('{% url "notes_list" %}');
+          return;
+        }
+      }
+    } catch (e) {
+      // network error - fall through and show the login form normally
     }
+    // Stale or invalid: clear it so we don't try (and loop) again.
+    localStorage.removeItem('notex_token');
+    localStorage.removeItem('notex_username');
   })();
 </script>
 <style>
@@ -175,7 +197,7 @@
     try {
       const res = await fetch('{% url "login_api" %}', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('notex_csrftoken') },
         body: JSON.stringify({
           username: document.getElementById('loginUsername').value,
           password: document.getElementById('loginPassword').value,
@@ -203,7 +225,7 @@
     try {
       const res = await fetch('{% url "signup_api" %}', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('notex_csrftoken') },
         body: JSON.stringify({
           username: document.getElementById('signupUsername').value,
           email: document.getElementById('signupEmail').value,

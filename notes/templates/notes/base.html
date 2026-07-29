@@ -360,6 +360,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       localStorage.removeItem('notex_token');
+      localStorage.removeItem('notex_username');
+      sessionStorage.removeItem('notex_token');
+      sessionStorage.removeItem('notex_username');
       document.getElementById('logoutForm').submit();
     });
   }

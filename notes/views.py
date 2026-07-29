@@ -85,8 +85,7 @@ def signup_api(request):
     except IntegrityError:
         return JsonResponse({'ok': False, 'error': 'Could not create account.'}, status=400)
 
-    login(request, user)
-    return JsonResponse({'ok': True, 'username': user.username, 'token': request.session.session_key})
+    return JsonResponse({'ok': True, 'username': user.username})
 
 
 @require_POST
@@ -94,12 +93,21 @@ def login_api(request):
     data = _json_body(request)
     username = (data.get('username') or '').strip()
     password = data.get('password') or ''
+    remember = bool(data.get('remember'))
 
     user = authenticate(request, username=username, password=password)
     if user is None:
         return JsonResponse({'ok': False, 'error': 'Invalid username or password.'}, status=400)
 
     login(request, user)
+    if remember:
+        # Persistent cookie: survives closing the browser, expires after
+        # SESSION_COOKIE_AGE (see settings.py).
+        request.session.set_expiry(None)
+    else:
+        # Browser-session cookie: Django/the browser discards it when the
+        # browser closes, so the user has to log in again next time.
+        request.session.set_expiry(0)
     return JsonResponse({'ok': True, 'username': user.username, 'token': request.session.session_key})
 
 

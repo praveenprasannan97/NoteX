@@ -20,10 +20,10 @@
     padding: 18px 20px; border-top: 1px solid var(--border);
   }
   .settings-row:first-of-type { border-top: none; }
+  .settings-row .info { min-width: 0; }
   .settings-row .info h4 { margin: 0 0 3px; font-size: 15px; }
   .settings-row .info p { margin: 0; font-size: 13px; color: var(--text-muted); }
   .settings-row .btn { flex-shrink: 0; width: 190px; justify-content: center; }
-  @media (max-width: 560px) { .settings-row .btn { width: auto; } }
 
   .settings-group.danger { border-color: var(--danger); }
   .settings-group.danger .settings-group-title { color: var(--danger); }
@@ -420,6 +420,8 @@ document.getElementById('deleteAcctStep2ConfirmBtn').addEventListener('click', a
   if (res.ok) {
     localStorage.removeItem('notex_token');
     localStorage.removeItem('notex_username');
+    sessionStorage.removeItem('notex_token');
+    sessionStorage.removeItem('notex_username');
     window.location.href = '{% url "auth" %}';
   } else {
     errEl.textContent = res.error || 'Could not delete account.';
